@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Cute Dessert Snake Game</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap');
+
+    body {
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #ffe4e1; /* MistyRose background */
+      background-image: radial-gradient(#ffb6c1 10%, transparent 10%), radial-gradient(#ffb6c1 10%, transparent 10%);
+      background-size: 40px 40px;
+      background-position: 0 0, 20px 20px;
+      font-family: 'Fredoka', sans-serif;
+      color: #7b435b;
+    }
+
+    .game-container {
+      background: white;
+      padding: 20px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(255, 105, 180, 0.2);
+      text-align: center;
+      position: relative;
+    }
+
+    h1 {
+      margin: 0 0 15px 0;
+      font-size: 32px;
+      color: #ff7aa2;
+      text-shadow: 2px 2px 0px #ffe4e1;
+    }
+
+    .score-board {
+      font-size: 24px;
+      font-weight: 600;
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+      padding: 0 10px;
+    }
+
+    canvas {
+      background: #fff5f7;
+      border: 4px solid #ffb6c1;
+      border-radius: 12px;
+      box-shadow: inset 0 0 10px rgba(255, 182, 193, 0.5);
+    }
+
+    .game-over-screen {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.85);
+      border-radius: 20px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 10;
+    }
+
+    .game-over-screen h2 {
+      font-size: 40px;
+      color: #ff477e;
+      margin: 0 0 10px 0;
+    }
+
+    button {
+      background: #ff7aa2;
+      color: white;
+      border: none;
+      padding: 12px 25px;
+      font-size: 18px;
+      font-family: 'Fredoka', sans-serif;
+      border-radius: 25px;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #d85c80;
+      transition: all 0.1s;
+    }
+
+    button:active {
+      transform: translateY(4px);
+      box-shadow: 0 0 0 #d85c80;
+    }
+  </style>
+</head>
+<body>
+
+<div class="game-container">
+  <h1>🍓 Sweet Snake 🍰</h1>
+  <div class="score-board">
+    <span>Score: <span id="score">0</span></span>
+  </div>
+  <canvas id="gameCanvas" width="400" height="400"></canvas>
+  
+  <div class="game-over-screen" id="gameOverScreen">
+    <h2>Oops! Nabrak!</h2>
+    <p style="font-size: 20px;">Skor kamu: <span id="finalScore">0</span></p>
+    <button onclick="resetGame()">Main Lagi 🎮</button>
+  </div>
+</div>
+
+<script>
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d");
+  const scoreElement = document.getElementById("score");
+  const gameOverScreen = document.getElementById("gameOverScreen");
+  const finalScoreElement = document.getElementById("finalScore");
+
+  const gridSize = 20; // Ukuran kotak
+  const tileCount = canvas.width / gridSize;
+
+  let snake = [];
+  let dx = 0;
+  let dy = 0;
+  let score = 0;
+  let gameLoop;
+  let changingDirection = false;
+
+  // Daftar dessert untuk dimakan
+  const desserts = ['🍰', '🧁', '🍩', '🍪', '🍮', '🍧', '🍨', '🥞', '🍫', '🍓'];
+  let food = { x: 0, y: 0, emoji: '' };
+
+  function initGame() {
+    // Posisi awal ular di tengah
+    snake = [
+      { x: 10, y: 10 },
+      { x: 9, y: 10 },
+      { x: 8, y: 10 }
+    ];
+    dx = 1; // Bergerak ke kanan awal
+    dy = 0;
+    score = 0;
+    scoreElement.innerText = score;
+    gameOverScreen.style.display = "none";
+    spawnFood();
+    if (gameLoop) clearInterval(gameLoop);
+    gameLoop = setInterval(main, 120); // Kecepatan ular
+  }
+
+  function main() {
+    if (hasGameEnded()) {
+      clearInterval(gameLoop);
+      gameOverScreen.style.display = "flex";
+      finalScoreElement.innerText = score;
+      return;
+    }
+
+    changingDirection = false;
+    clearCanvas();
+    drawFood();
+    moveSnake();
+    drawSnake();
+  }
+
+  function clearCanvas() {
+    ctx.fillStyle = "#fff5f7"; // Background canvas pastel
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function drawSnake() {
+    snake.forEach((part, index) => {
+      const isHead = index === 0;
+      
+      // Warna kepala lebih gelap dari badan
+      ctx.fillStyle = isHead ? "#ff7aa2" : "#ffb6c1";
+      
+      // Menggambar ular bulat-bulat
+      ctx.beginPath();
+      ctx.arc(
+        part.x * gridSize + gridSize / 2, 
+        part.y * gridSize + gridSize / 2, 
+        gridSize / 2 - 1, 
+        0, 
+        2 * Math.PI
+      );
+      ctx.fill();
+
+      // Tambahkan mata untuk kepala
+      if (isHead) {
+        ctx.fillStyle = "white";
+        // Mata kiri
+        ctx.beginPath();
+        ctx.arc(part.x * gridSize + 6, part.y * gridSize + 8, 3, 0, 2 * Math.PI);
+        ctx.fill();
+        // Mata kanan
+        ctx.beginPath();
+        ctx.arc(part.x * gridSize + 14, part.y * gridSize + 8, 3, 0, 2 * Math.PI);
+        ctx.fill();
+
+        ctx.fillStyle = "black";
+        // Pupil
+        ctx.beginPath();
+        ctx.arc(part.x * gridSize + 6, part.y * gridSize + 8, 1.5, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(part.x * gridSize + 14, part.y * gridSize + 8, 1.5, 0, 2 * Math.PI);
+        ctx.fill();
+      }
+    });
+  }
+
+  function moveSnake() {
+    // Hitung posisi kepala baru
+    const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+    snake.unshift(head); // Tambah kepala baru ke depan
+
+    // Cek apakah makan dessert
+    if (head.x === food.x && head.y === food.y) {
+      score += 10;
+      scoreElement.innerText = score;
+      spawnFood();
+    } else {
+      snake.pop(); // Hapus ekor jika tidak makan
+    }
+  }
+
+  function drawFood() {
+    ctx.font = "18px Arial";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    // Menempatkan emoji tepat di tengah grid
+    ctx.fillText(
+      food.emoji, 
+      food.x * gridSize + gridSize / 2, 
+      food.y * gridSize + gridSize / 2 + 2
+    );
+  }
+
+  function spawnFood() {
+    food.x = Math.floor(Math.random() * tileCount);
+    food.y = Math.floor(Math.random() * tileCount);
+    
+    // Pilih dessert acak
+    food.emoji = desserts[Math.floor(Math.random() * desserts.length)];
+
+    // Pastikan makanan tidak muncul di badan ular
+    snake.forEach(function isFoodOnSnake(part) {
+      if (part.x === food.x && part.y === food.y) {
+        spawnFood();
+      }
+    });
+  }
+
+  function hasGameEnded() {
+    // Nabrak badan sendiri
+    for (let i = 4; i < snake.length; i++) {
+      if (snake[i].x === snake[0].x && snake[i].y === snake[0].y) return true;
+    }
+    // Nabrak tembok
+    const hitLeftWall = snake[0].x < 0;
+    const hitRightWall = snake[0].x >= tileCount;
+    const hitTopWall = snake[0].y < 0;
+    const hitBottomWall = snake[0].y >= tileCount;
+
+    return hitLeftWall || hitRightWall || hitTopWall || hitBottomWall;
+  }
+
+  function changeDirection(event) {
+    // Mencegah reverse arah secara instan (agar tidak mati bunuh diri)
+    if (changingDirection) return;
+    
+    const LEFT_KEY = 37;
+    const RIGHT_KEY = 39;
+    const UP_KEY = 38;
+    const DOWN_KEY = 40;
+
+    const keyPressed = event.keyCode;
+    const goingUp = dy === -1;
+    const goingDown = dy === 1;
+    const goingRight = dx === 1;
+    const goingLeft = dx === -1;
+
+    if (keyPressed === LEFT_KEY && !goingRight) {
+      dx = -1; dy = 0; changingDirection = true;
+    }
+    if (keyPressed === UP_KEY && !goingDown) {
+      dx = 0; dy = -1; changingDirection = true;
+    }
+    if (keyPressed === RIGHT_KEY && !goingLeft) {
+      dx = 1; dy = 0; changingDirection = true;
+    }
+    if (keyPressed === DOWN_KEY && !goingUp) {
+      dx = 0; dy = 1; changingDirection = true;
+    }
+  }
+
+  function resetGame() {
+    initGame();
+  }
+
+  document.addEventListener("keydown", changeDirection);
+  
+  // Mulai game saat halaman dimuat
+  initGame();
+</script>
+
+</body>
+</html>
